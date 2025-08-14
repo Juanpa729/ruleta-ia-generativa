@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruleta con IA Generativa</title>
+    <!-- Estilos CSS integrados -->
+    <style>
+        :root {
+            --primary-color: #8e44ad; /* Tono morado */
+            --secondary-color: #1abc9c; /* Turquesa */
+            --action-color: #3498db; /* Azul */
+            --reset-color: #e74c3c; /* Rojo */
+            --background-color: #ecf0f1;
+            --text-color: #2c3e50;
+            --light-text-color: #ffffff;
+            --border-color: #bdc3c7;
+            --shadow-color: rgba(0, 0, 0, 0.15);
+            --disabled-color: #95a5a6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-shadow: 1px 1px 2px var(--shadow-color);
+            text-align: center;
+        }
+
+        .roulette-container {
+            position: relative;
+            width: 90vw;
+            max-width: 500px;
+            height: 90vw;
+            max-height: 500px;
+            margin-bottom: 20px;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.5s ease;
+        }
+        
+        .pointer {
+            position: absolute;
+            top: 50%;
+            right: -15px; /* Posicionado a la derecha */
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            /* Triángulo apuntando a la izquierda */
+            border-top: 20px solid transparent;
+            border-bottom: 20px solid transparent;
+            border-right: 35px solid var(--primary-color);
+            filter: drop-shadow(2px 2px 2px var(--shadow-color));
+            z-index: 10;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            background-color: var(--light-text-color);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+            width: 90%;
+            max-width: 500px;
+            box-sizing: border-box;
+        }
+
+        label {
+            font-size: 1.1em;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        #options-input {
+            width: 100%;
+            padding: 12px;
+            font-size: 1em;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+
+        #options-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+
+        button {
+            padding: 12px 5px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            color: var(--light-text-color);
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.3s, transform 0.1s;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+        }
+
+        #generate-btn { background-color: var(--primary-color); }
+        #spin-btn { background-color: var(--secondary-color); }
+        #spin-remove-btn { background-color: var(--action-color); }
+        #reset-btn { background-color: var(--reset-color); }
+        
+        button:disabled {
+            background-color: var(--disabled-color);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button:not(:disabled):hover {
+            transform: translateY(-2px);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 30px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+            border-radius: 15px;
+            text-align: center;
+            animation: fadeIn 0.5s;
+        }
+        
+        .modal-content h2 {
+            margin-top: 0;
+            color: var(--secondary-color);
+        }
+
+        .modal-content p {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 20px 0;
+            color: var(--primary-color);
+        }
+
+        .close-button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        
+        @keyframes fadeIn {
+            from {opacity: 0; transform: scale(0.9);}
+            to {opacity: 1; transform: scale(1);}
+        }
+    </style>
+</head>
+<body>
+    <h1>Ruleta con IA Generativa</h1>
+    
+    <div class="roulette-container">
+        <div class="pointer"></div>
+        <canvas id="canvas" width="500" height="500"></canvas>
+    </div>
+
+    <div class="controls">
+        <label for="options-input">¿De qué quieres la ruleta hoy?</label>
+        <input type="text" id="options-input" placeholder="Ej: 10 pokémon, planetas, etc.">
+        <div class="button-grid">
+            <button id="generate-btn">Generar</button>
+            <button id="reset-btn" disabled>Reiniciar</button>
+            <button id="spin-btn" disabled>Girar</button>
+            <button id="spin-remove-btn" disabled>Girar y Eliminar</button>
+        </div>
+    </div>
+
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <h2>¡El resultado es!</h2>
+            <p id="prize-text"></p>
+            <button class="close-button">Cerrar</button>
+        </div>
+    </div>
+    
+    <!-- NOTA IMPORTANTE SOBRE GOOGLE SITES:
+        Esta aplicación realiza una llamada a una API de IA externa para generar las opciones.
+        Debido a las políticas de seguridad de los navegadores, esta llamada será BLOQUEADA si el archivo
+        se ejecuta dentro de un "iframe" en plataformas como Google Sites.
+        
+        SOLUCIÓN:
+        1. Abre este archivo HTML directamente en tu navegador.
+        2. Usa el botón "Generar" para crear la ruleta que desees.
+        3. Una vez generada, la ruleta y sus funciones (girar, eliminar, reiniciar) funcionarán
+           perfectamente, incluso si la incrustas en Google Sites.
+    -->
+
+    <!-- Librería de Animación GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+    <!-- Librería Winwheel.js integrada y corregida -->
+    <script>
+        class Winwheel {
+            constructor(options, drawWheel) {
+                this.canvasId = null; this.canvas = null; this.ctx = null; this.numSegments = 0; this.outerRadius = null; this.innerRadius = 0; this.rotationAngle = 0; this.textFontSize = 20; this.textFontFamily = 'Arial'; this.textFontWeight = 'normal'; this.textFillStyle = 'black'; this.segments = []; this.animation = null; this.pointerAngle = 0;
+                for (let key in options) { if (options.hasOwnProperty(key)) { this[key] = options[key]; } }
+                if (this.canvasId) { this.canvas = document.getElementById(this.canvasId); if (this.canvas) { this.ctx = this.canvas.getContext('2d'); } }
+                if (drawWheel !== false) { this.draw(); }
+            }
+            draw() { if (!this.ctx) return; this.clearCanvas(); this.drawSegments(); this.drawSegmentText(); }
+            clearCanvas() { this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); }
+            degToRad(d) { return d * Math.PI / 180; }
+            drawSegments() {
+                if (this.numSegments < 1) return;
+                const centerX = this.canvas.width / 2; const centerY = this.canvas.height / 2; const segmentAngle = 360 / this.numSegments;
+                for (let i = 1; i <= this.numSegments; i++) {
+                    const segment = this.segments[i - 1];
+                    const startAngle = this.degToRad((i - 1) * segmentAngle + this.rotationAngle); const endAngle = this.degToRad(i * segmentAngle + this.rotationAngle);
+                    this.ctx.beginPath(); this.ctx.fillStyle = segment.fillStyle; this.ctx.moveTo(centerX, centerY); this.ctx.arc(centerX, centerY, this.outerRadius, startAngle, endAngle); this.ctx.closePath(); this.ctx.fill();
+                }
+            }
+            drawSegmentText() {
+                if (this.numSegments < 1) return;
+                const centerX = this.canvas.width / 2; const centerY = this.canvas.height / 2; const segmentAngle = 360 / this.numSegments;
+                for (let i = 1; i <= this.numSegments; i++) {
+                    const segment = this.segments[i - 1]; if (!segment.text) continue;
+                    const angle = (i - 1) * segmentAngle + segmentAngle / 2 + this.rotationAngle; const textRadius = this.innerRadius + (this.outerRadius - this.innerRadius) / 2;
+                    this.ctx.save(); this.ctx.translate(centerX, centerY); this.ctx.rotate(this.degToRad(angle));
+                    this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle'; this.ctx.fillStyle = this.textFillStyle; this.ctx.font = `${this.textFontWeight} ${this.textFontSize}px ${this.textFontFamily}`;
+                    this.ctx.fillText(segment.text, textRadius, 0); this.ctx.restore();
+                }
+            }
+            getIndicatedSegmentNumber() {
+                let currentAngle = this.rotationAngle % 360; if (currentAngle < 0) currentAngle += 360;
+                let relativeAngle = 360 - currentAngle + this.pointerAngle; if (relativeAngle >= 360) relativeAngle -= 360;
+                const segmentAngle = 360 / this.numSegments; const segmentIndex = Math.floor(relativeAngle / segmentAngle);
+                return segmentIndex;
+            }
+            getIndicatedSegment() { return this.segments[this.getIndicatedSegmentNumber()]; }
+            startAnimation() {
+                if (!this.animation) return; if (typeof gsap === 'undefined') { console.error("GSAP is not loaded."); return; }
+                this.stopAnimation(false);
+                const totalSpins = 360 * this.animation.spins; const stopAt = Math.floor(Math.random() * 360); const targetAngle = 360 - stopAt + this.pointerAngle; const finalRotation = totalSpins + targetAngle;
+                let lastSegmentNum = 0;
+                gsap.to(this, {
+                    rotationAngle: finalRotation, duration: this.animation.duration, ease: this.animation.easing,
+                    onUpdate: () => {
+                        this.draw();
+                        const currentSegmentNum = this.getIndicatedSegmentNumber();
+                        if (currentSegmentNum !== lastSegmentNum) {
+                            if (this.animation.callbackSound) { this.animation.callbackSound(); }
+                            lastSegmentNum = currentSegmentNum;
+                        }
+                    },
+                    onComplete: () => { if (this.animation.callbackFinished) { this.animation.callbackFinished(this.getIndicatedSegment()); } }
+                });
+            }
+            stopAnimation(canCallback) {
+                gsap.killTweensOf(this);
+                if (canCallback === false) { this.rotationAngle = 0; this.draw(); }
+            }
+        }
+    </script>
+    
+    <!-- Lógica de la aplicación con IA -->
+    <script>
+        const optionsInput = document.getElementById('options-input');
+        const generateBtn = document.getElementById('generate-btn');
+        const spinBtn = document.getElementById('spin-btn');
+        const spinRemoveBtn = document.getElementById('spin-remove-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const resultModal = document.getElementById('result-modal');
+        const prizeText = document.getElementById('prize-text');
+        const closeButton = document.querySelector('.close-button');
+
+        let theWheel;
+        let audioCtx;
+        let originalSegments = [];
+        let currentSegments = [];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+        document.body.addEventListener('click', initAudio, { once: true });
+
+        function getRandomColor() {
+            const hue = Math.floor(Math.random() * 360);
+            return `hsl(${hue}, 80%, 60%)`;
+        }
+
+        async function getAiGeneratedSegments(userInput) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: `Basado en la petición: "${userInput}", genera un array JSON de objetos. Cada objeto debe tener una propiedad "text". La lista debe ser relevante. Si pide un número de elementos, respétalo. Si no, genera entre 8 y 12. Devuelve únicamente el array JSON.` }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { "text": { "type": "STRING" } }, required: ["text"] } }
+                }
+            };
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                const result = await response.json();
+                if (result.candidates && result.candidates[0].content.parts[0]) {
+                    const jsonText = result.candidates[0].content.parts[0].text;
+                    const parsedJson = JSON.parse(jsonText);
+                    return parsedJson.map(item => ({ ...item, fillStyle: getRandomColor() }));
+                }
+                return null;
+            } catch (error) {
+                console.error("Fallo al contactar la IA:", error);
+                return null;
+            }
+        }
+
+        function createWheel(segments) {
+            if (theWheel) {
+                theWheel.stopAnimation(false);
+            }
+            theWheel = new Winwheel({
+                'canvasId': 'canvas',
+                'numSegments': segments.length,
+                'outerRadius': 240,
+                'innerRadius': 0,
+                'textFontSize': segments.length > 20 ? 14 : 20,
+                'textFontFamily': 'Segoe UI',
+                'textFontWeight': 'bold',
+                'textFillStyle': 'white',
+                'segments': segments,
+                'animation': {
+                    'duration': 8, 'spins': 10, 'easing': 'power3.out',
+                    'callbackFinished': (prize) => showPrize(prize),
+                    'callbackSound': playTickSound,
+                },
+                'pointerAngle': 0,
+            });
+        }
+        
+        generateBtn.addEventListener('click', async () => {
+            const userInput = optionsInput.value.trim();
+            if (userInput.length < 3) { alert("Por favor, introduce una descripción más detallada."); return; }
+            
+            setButtonsState(true, 'Generando...');
+            
+            const segments = await getAiGeneratedSegments(userInput);
+            if (segments && segments.length > 1) {
+                originalSegments = JSON.parse(JSON.stringify(segments));
+                currentSegments = segments;
+                createWheel(currentSegments);
+                setButtonsState(false);
+                resetBtn.disabled = false;
+            } else {
+                alert("No se pudieron generar opciones. Intenta ser más específico.");
+                setButtonsState(false);
+            }
+        });
+        
+        resetBtn.addEventListener('click', () => {
+            if (originalSegments.length > 0) {
+                currentSegments = JSON.parse(JSON.stringify(originalSegments));
+                createWheel(currentSegments);
+                setButtonsState(false);
+            }
+        });
+
+        spinBtn.addEventListener('click', () => {
+            if (theWheel) {
+                theWheel.animation.callbackFinished = (prize) => showPrize(prize);
+                setButtonsState(true);
+                theWheel.startAnimation();
+            }
+        });
+        
+        spinRemoveBtn.addEventListener('click', () => {
+            if (theWheel && currentSegments.length > 1) {
+                theWheel.animation.callbackFinished = (prize) => showPrizeAndRemove(prize);
+                setButtonsState(true);
+                theWheel.startAnimation();
+            } else if (currentSegments.length <= 1) {
+                alert("No quedan suficientes opciones para girar y eliminar.");
+            }
+        });
+
+        function showPrize(indicatedSegment) {
+            playWinSound();
+            displayPrize(indicatedSegment);
+            setButtonsState(false);
+        }
+
+        function showPrizeAndRemove(indicatedSegment) {
+            playWinSound();
+            displayPrize(indicatedSegment);
+
+            const prizeText = indicatedSegment.text;
+            currentSegments = currentSegments.filter(seg => seg.text !== prizeText);
+
+            if (currentSegments.length > 0) {
+                createWheel(currentSegments);
+                 setButtonsState(false);
+            } else {
+                theWheel.clearCanvas();
+                alert("¡Se han acabado las opciones de la ruleta!");
+                setButtonsState(true, 'Generar'); // Disable spin, enable generate
+                spinBtn.disabled = true;
+                spinRemoveBtn.disabled = true;
+            }
+        }
+        
+        function displayPrize(indicatedSegment) {
+            if (indicatedSegment && indicatedSegment.text) {
+                prizeText.textContent = indicatedSegment.text;
+            } else {
+                prizeText.textContent = "¡Inténtalo de nuevo!";
+            }
+            resultModal.style.display = 'flex';
+        }
+        
+        function setButtonsState(isSpinning, generateText = 'Generar') {
+            generateBtn.disabled = isSpinning;
+            generateBtn.textContent = generateText;
+            spinBtn.disabled = isSpinning || currentSegments.length < 1;
+            spinRemoveBtn.disabled = isSpinning || currentSegments.length < 2;
+            resetBtn.disabled = isSpinning || originalSegments.length < 1;
+        }
+
+        closeButton.addEventListener('click', () => { resultModal.style.display = 'none'; });
+        window.addEventListener('click', (event) => { if (event.target == resultModal) { resultModal.style.display = 'none'; } });
+
+        function playTickSound() {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.05); gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            oscillator.start(audioCtx.currentTime); oscillator.stop(audioCtx.currentTime + 0.06);
+        }
+
+        function playWinSound() {
+            if (!audioCtx) return;
+            const notes = [523.25, 659.25, 783.99, 1046.50]; let startTime = audioCtx.currentTime;
+            notes.forEach((note, index) => {
+                const oscillator = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+                oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(note, startTime + index * 0.1); gainNode.gain.setValueAtTime(0.2, startTime + index * 0.1);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + index * 0.1 + 0.1);
+                oscillator.start(startTime + index * 0.1); oscillator.stop(startTime + index * 0.1 + 0.12);
+            });
+        }
+    </script>
+
+</body>
+</html>
